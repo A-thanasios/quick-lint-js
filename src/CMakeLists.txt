@@ -52,6 +52,15 @@ quick_lint_js_add_library(
 target_include_directories(quick-lint-js-lib PUBLIC include)
 target_link_libraries(quick-lint-js-lib PUBLIC boost_container)
 
+quick_lint_js_add_executable(
+  # @@@ make conditional
+  # @@@ name plz
+  quick-lint-js-emcc
+  emcc.cpp
+)
+target_link_libraries(quick-lint-js-emcc PRIVATE quick-lint-js-lib)
+target_link_libraries(quick-lint-js-emcc PRIVATE "-sMODULARIZE" "-sEXPORTED_FUNCTIONS='[\"_quick_lint_js_parse_and_lint_to_json\"]'" "-sEXPORTED_RUNTIME_METHODS='[\"ccall\", \"cwrap\"]'")
+
 if (QUICK_LINT_JS_FEATURE_VECTOR_PROFILING)
   target_compile_definitions(
     quick-lint-js-lib

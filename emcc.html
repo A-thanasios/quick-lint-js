@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+  <head>
+  </head>
+  <body>
+    <main>
+      <h1>helloworld</h1>
+
+      <!--
+
+      approaches:
+      * <textarea>
+        [x] get absolute position of some text
+            * browser APIs don't work (except maybe classic IE)
+        [_] shadow <div>, get absolute position of text
+        [_] background <div>, show highlights behind <textarea>
+      * <div contenteditable>
+        [x] rich-text paste
+            * paste event https://stackoverflow.com/a/36846308
+        [x] Firefox shift-enter enter bug
+            * document.execCommand("defaultParagraphSeparator", false, "br");
+
+
+      bugs:
+      [x] when backspacing the entire input, focus is lost.
+      [x] when backspacing a mark, focus is lost. e.g. "let x = 3 +"
+      [x] press enter after the first ';' (Firefox): const x = 3; x += 1; x++;
+      [x] move cursor to after the second 'x' (marked), then press left arrow key, then press enter (Firefox): const x = 3; x += 1; x++;
+      [_] browser undo ;__;
+      -->
+
+      <style>
+pre {
+  padding: 3px;
+  border: 1px solid red !important;
+}
+      </style>
+
+      <pre id="code-input" contenteditable="plaintext-only" spellcheck="false">helloworld</pre>
+      <pre id="preview"></pre>
+
+<script type="module">
+// make text input sane plz
+
+document.execCommand("defaultParagraphSeparator", false, "br");
+
+let codeInputElement = document.getElementById("code-input");
+codeInputElement.contentEditable = 'true';
+try {
+  codeInputElement.contentEditable = 'plaintext-only';
+} catch (e) {
+  if (e instanceof window.DOMException) {
+    // plaintext-only is not supported. Ignore.
+  } else {
+    throw e;
+  }
+}
+
+// @@@ credit https://stackoverflow.com/a/36846308
+codeInputElement.addEventListener("paste", (event) => {
+        event.preventDefault();
+        let text = event.clipboardData.getData("text/plain");
+        document.execCommand("insertHTML", false, text);
+});
+</script>
+
+<script src="./build-emscripten/src/quick-lint-js-emcc.js"></script>
+<script type="module">
+import {getEditorText, markEditorText} from "./demo/editor.mjs";
+
+let loadQuickLintJS = Module;
+
+loadQuickLintJS().then((quickLintJS) => {
+  let parseAndLintToJSON = quickLintJS.cwrap('quick_lint_js_parse_and_lint_to_json', 'string', ['string']);
+
+  let codeInputElement = document.getElementById("code-input");
+  let previewElement = document.getElementById("preview");
+  function lintAndUpdate() {
+    let input = getEditorText(codeInputElement, window);
+    previewElement.innerText = input;
+
+    let selectionRange = window.getSelection().getRangeAt(0);
+    console.log("before marking", {
+      startContainer: selectionRange.startContainer,
+      startOffset: selectionRange.startOffset,
+      endContainer: selectionRange.endContainer,
+      endOffset: selectionRange.endOffset,
+    });
+
+    let beforeHTML = codeInputElement.innerHTML;
+    let errorsJSON = parseAndLintToJSON(input);
+    let errors = JSON.parse(errorsJSON);
+    let marks = errors.qflist.map((entry) => ({begin: entry.col-1, end: entry.end_col}));
+    markEditorText(codeInputElement, window, marks, selectionRange);
+    console.log("before", beforeHTML, "after", codeInputElement.innerHTML);
+
+    console.log("after marking", {
+      startContainer: selectionRange.startContainer,
+      startOffset: selectionRange.startOffset,
+      endContainer: selectionRange.endContainer,
+      endOffset: selectionRange.endOffset,
+    });
+  }
+  codeInputElement.addEventListener("input", (event) => {
+    lintAndUpdate();
+  });
+  lintAndUpdate();
+});
+</script>
+    </main>
+  </body>
+</html>
